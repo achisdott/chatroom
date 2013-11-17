@@ -83,7 +83,6 @@ int main(int argc, char * argv[]) {
         }
         if(FD_ISSET(fileno(stdin), &rset)) {
             if(fgets(send_buf, 1024, stdin) == NULL || !strcmp("/quit\n", send_buf)) {
-                printf("Bye!\n");
                 break;
             } else {
                 /* SEND() */

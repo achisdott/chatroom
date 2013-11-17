@@ -11,8 +11,8 @@ Socket Programming Practice
 
 ## Spec
 
-1. Broadcast Message
-2. Private Message
-3. Change Nickname
-4. Who
-5. Quit
+1. Broadcast Message: `<Message>`
+2. Private Message: `/private <Nick> <Message>`
+3. Change Nickname: `/nick <Nick>`
+4. Who: `/who`
+5. Quit: `/quit`
