@@ -232,13 +232,13 @@ int buf_loader(struct profile * user[], int itself, int msg_type, char buf[], in
                 inet_ntop(AF_INET, &(sin.sin_addr), ip_buf, INET_ADDRSTRLEN);
                 snprintf(port_buf, sizeof(port_buf), "%u", ntohs(sin.sin_port));
             }
-            msg_len = snprintf(buf, size, "[Server] Hello, %s! ServerIP: %s:%s\n", user[itself]->name, ip_buf, port_buf);
+            msg_len = snprintf(buf, size, "/serv Hello, %s! ServerIP: %s:%s\n", user[itself]->name, ip_buf, port_buf);
             break;
         case WELC:
-            msg_len = snprintf(buf, size, "[Server] Someone is coming!\n");
+            msg_len = snprintf(buf, size, "/serv Someone is coming!\n");
             break;
         case BYE:
-            msg_len = snprintf(buf, size, "[Server] %s is offline.\n", user[itself]->name);
+            msg_len = snprintf(buf, size, "/serv %s is offline.\n", user[itself]->name);
             break;
         default:
             msg_len = 0;
@@ -261,7 +261,7 @@ int broadcast(int connected[], int itself, char buf[], int size) {
 }
 
 int cmd_process(struct profile * user[], int itself, int connected[], char buf[], int size) {
-    int i, nick_len = 0, line_len = 0, total_len = 0;
+    int i, nick_len = 0, line_len = 0;
     char * cmd = NULL;
     char * content = NULL;
     char * nick = NULL;
@@ -272,28 +272,16 @@ int cmd_process(struct profile * user[], int itself, int connected[], char buf[]
     memcpy(tmp, buf, size * sizeof(char));
     cmd = strtok(tmp, " ");
 
-    if(!strcmp("/who\n", cmd) || !strcmp("/who", cmd)) {
+    if(!strcmp("/who\n", cmd)) {
         for(i = 0; i < MAX_USER_COUNT; i++) {
             if(connected[i] == TRUE) {
-                line_len = strlen(user[i]->name) + strlen(user[i]->addr) + strlen(user[i]->port) + 11;
-                total_len += line_len;
+                msg = (char *)malloc(128 * sizeof(char) + 1);
+                memset(msg, 0, 128 * sizeof(char) + 1);
+                snprintf(msg, 128, "/serv %s %s:%s\n", user[i]->name, user[i]->addr, user[i]->port);
+                send(itself, msg, strlen(msg) + 1, 0);
+                free(msg);
             }
         }
-        msg = (char *)malloc(total_len * sizeof(char) + 1);
-        memset(msg, 0, total_len * sizeof(char) + 1);
-        for(i = 0; i < MAX_USER_COUNT; i++) {
-            if(connected[i] == TRUE) {
-                strcat(msg, "[Server] ");
-                strcat(msg, user[i]->name);
-                strcat(msg, " ");
-                strcat(msg, user[i]->addr);
-                strcat(msg, ":");
-                strcat(msg, user[i]->port);
-                strcat(msg, "\n");
-            }
-        }
-        send(itself, msg, strlen(msg) + 1, 0);
-        free(msg);
     } else if(!strcmp("/nick", cmd)) {
         content = tmp + strlen(cmd) + 1;
         nick = strtok(content, " ");
@@ -301,19 +289,19 @@ int cmd_process(struct profile * user[], int itself, int connected[], char buf[]
         msg = (char *)malloc(128 * sizeof(char));
         memset(msg, 0, 128 * sizeof(char));
         if(strlen(nick) < 2 || strlen(nick) > 12) {
-            line_len = snprintf(msg, 128, "[Server] Error: Username can only consists of 2~12 English letters.\n");
+            line_len = snprintf(msg, 128, "/serv Error: Username can only consists of 2~12 English letters.\n");
             send(itself, msg, line_len + 1, 0);
             free(msg);
             return -1;
         } else if(!strcmp("anonymous", nick)) {
-            line_len = snprintf(msg, 128, "[Server] Error: Username can not be anonymous.\n");
+            line_len = snprintf(msg, 128, "/serv Error: Username can not be anonymous.\n");
             send(itself, msg, line_len + 1, 0);
             free(msg);
             return -1;
         } else {
             for(i = 0; i < strlen(nick); i++) {
                 if(!isalpha(nick[i])) {
-                    line_len = snprintf(msg, 128, "[Server] Error: Username can only consists of 2~12 English letters.\n");
+                    line_len = snprintf(msg, 128, "/serv Error: Username can only consists of 2~12 English letters.\n");
                     send(itself, msg, line_len + 1, 0);
                     free(msg);
                     return -1;
@@ -325,7 +313,7 @@ int cmd_process(struct profile * user[], int itself, int connected[], char buf[]
                 }
                 if(connected[i] == TRUE) {
                     if(!strcmp(user[i]->name, nick)) {
-                        line_len = snprintf(msg, 128, "[Server] ERROR: %s has been used by others.\n", user[i]->name);
+                        line_len = snprintf(msg, 128, "/serv ERROR: %s has been used by others.\n", user[i]->name);
                         send(itself, msg, line_len + 1, 0);
                         free(msg);
                         return -1;
@@ -333,18 +321,18 @@ int cmd_process(struct profile * user[], int itself, int connected[], char buf[]
                 }
             }
         }
-        line_len = snprintf(msg, 128, "[Server] %s is now known as %s.\n", user[itself]->name, nick);
+        line_len = snprintf(msg, 128, "/serv %s is now known as %s.\n", user[itself]->name, nick);
         broadcast(connected, itself, msg, line_len + 1);
         memset(msg, 0, 128 * sizeof(char));
         nick_len = snprintf(user[itself]->name, MAX_NAME_LEN, "%s", nick);
-        line_len = snprintf(msg, 128, "[Server] You're now known as %s.\n", user[itself]->name);
+        line_len = snprintf(msg, 128, "/serv You're now known as %s.\n", user[itself]->name);
         send(itself, msg, line_len + 1, 0);
         free(msg);
     } else if(!strcmp("/private", cmd)) {
         if(!strcmp(user[itself]->name, "anonymous")) {
             msg = (char *)malloc(128 * sizeof(char));
             memset(msg, 0, 128 * sizeof(char));
-            line_len = snprintf(msg, 128, "[Server] ERROR: You are anonymous.\n");
+            line_len = snprintf(msg, 128, "/serv ERROR: You are anonymous.\n");
             send(itself, msg, line_len + 1, 0);
             free(msg);
             return -1;
@@ -354,24 +342,21 @@ int cmd_process(struct profile * user[], int itself, int connected[], char buf[]
         if(!strcmp(nick, "anonymous")) {
             msg = (char *)malloc(128 * sizeof(char));
             memset(msg, 0, 128 * sizeof(char));
-            line_len = snprintf(msg, 128, "ERROR: The client to which you sent is anonymous.\n");
+            line_len = snprintf(msg, 128, "/serv ERROR: The client to which you sent is anonymous.\n");
             send(itself, msg, line_len + 1, 0);
             free(msg);
             return -1;
         }
-        /*nick[strlen(nick) - 1] = '\0';*/
         for(i = 0; i < MAX_USER_COUNT; i++) {
-            /*printf("%d:%d\n", i, connected[i]);*/
             if(connected[i] == TRUE) {
-                /*printf("%s\t%s\n", user[i]->name, nick);*/
                 if(!strcmp(user[i]->name, nick)) {
                     content = content + strlen(nick) + 1; /* CAUTION! MAY COREDUMP */
                     msg = (char *)malloc(1024 * sizeof(char));
                     memset(msg, 0, 1024 * sizeof(char));
-                    line_len = snprintf(msg, 1024, "[Server] SUCCESS: Your message has been sent.\n");
+                    line_len = snprintf(msg, 1024, "/serv SUCCESS: Your message has been sent.\n");
                     send(itself, msg, line_len + 1, 0);
                     memset(msg, 0, 1024 * sizeof(char));
-                    line_len = snprintf(msg, 1024, "[Private] %s SAID: %s", user[itself]->name, content);
+                    line_len = snprintf(msg, 1024, "/private %s SAID: %s", user[itself]->name, content);
                     send(i, msg, line_len + 1, 0);
                     free(msg);
                     return 0;
@@ -380,23 +365,23 @@ int cmd_process(struct profile * user[], int itself, int connected[], char buf[]
         }
         msg = (char *)malloc(128 * sizeof(char));
         memset(msg, 0, 128 * sizeof(char));
-        line_len = snprintf(msg, 128, "[Server] ERROR: The client doesn't exist.\n");
+        line_len = snprintf(msg, 128, "/serv ERROR: The client doesn't exist.\n");
         send(itself, msg, line_len + 1, 0);
         free(msg);
         return -1;
-    } else if(!strcmp("/quit", cmd) || !strcmp("/quit\n", cmd)) {
+    } else if(!strcmp("/quit\n", cmd)) {
         return 1;
     } else if(cmd[0] == '/') {
         msg = (char *)malloc(128 * sizeof(char));
         memset(msg, 0, 128 * sizeof(char));
-        line_len = snprintf(msg, 128, "[Server] ERROR: Error command.\n");
+        line_len = snprintf(msg, 128, "/serv ERROR: Error command.\n");
         send(itself, msg, line_len + 1, 0);
         free(msg);
         return -1;
     } else {
         msg = (char *)malloc(1024 * sizeof(char));
         memset(msg, 0, 1024 * sizeof(char));
-        line_len = snprintf(msg, 1024, "%s SAID: %s", user[itself]->name, buf);
+        line_len = snprintf(msg, 1024, "/msg %s SAID: %s", user[itself]->name, buf);
         broadcast(connected, itself, msg, line_len + 1);
         send(itself, msg, line_len + 1, 0);
         free(msg);

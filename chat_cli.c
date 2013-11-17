@@ -7,12 +7,15 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 
+void show_msg(char [], int);
+
 int main(int argc, char * argv[]) {
     int len, rc;
     int sockfd;
     int maxfd;
     char send_buf[1024];
     char recv_buf[1024];
+    char * recv_tmp = recv_buf;
     struct hostent * host;
     struct sockaddr_in addr;
     struct fd_set rset;
@@ -39,7 +42,6 @@ int main(int argc, char * argv[]) {
     /* CONNECT() */
     memset(&addr, 0, sizeof(addr));
     addr.sin_family = AF_INET;
-    /*addr.sin_addr.s_addr = htonl(INADDR_ANY);*/
     memcpy(&addr.sin_addr, host->h_addr, host->h_length);
     addr.sin_port = htons(atoi(argv[2]));
     rc = connect(sockfd, (struct sockaddr *)&addr, sizeof(struct sockaddr_in));
@@ -58,25 +60,29 @@ int main(int argc, char * argv[]) {
         rc = select(maxfd + 1, &rset, NULL, NULL, NULL);
         if(FD_ISSET(sockfd, &rset)) {
             /* RECV() */
+            recv_tmp = recv_buf;
             len = recv(sockfd, recv_buf, sizeof(recv_buf), 0);
             if(len != strlen(recv_buf) + 1) {
                 if(len == 0) {
                     printf("Connection closed by server\n");
                     break;
-                } else {
-                    /*printf("%d\n", len);
-                    printf("%s", recv_buf);*/
+                } else if(len < 0) {
                     perror("recv() failed");
                     close(sockfd);
                     exit(-1);
+                } else {
+                    while((recv_tmp - recv_buf) < len) {
+                        show_msg(recv_tmp, sizeof(recv_buf));
+                        recv_tmp = recv_tmp + strlen(recv_tmp) + 1;
+                    }
                 }
+            } else {
+                show_msg(recv_buf, sizeof(recv_buf));
+                memset(recv_buf, 0, sizeof(recv_buf));
             }
-            /*printf("%d\n", len);*/
-            printf("%s", recv_buf);
-            memset(recv_buf, 0, sizeof(recv_buf));
         }
         if(FD_ISSET(fileno(stdin), &rset)) {
-            if(fgets(send_buf, 1024, stdin) == NULL) {
+            if(fgets(send_buf, 1024, stdin) == NULL || !strcmp("/quit\n", send_buf)) {
                 printf("Bye!\n");
                 break;
             } else {
@@ -95,4 +101,33 @@ int main(int argc, char * argv[]) {
     close(sockfd);
 
     return 0;
+}
+
+void show_msg(char buf[], int size) {
+    char * cmd = NULL;
+    char * content = NULL;
+    char * msg = NULL;
+    char * tmp = NULL;
+
+    tmp = (char *)malloc(size * sizeof(char));
+    memcpy(tmp, buf, size * sizeof(char));
+
+    cmd = strtok(tmp, " ");
+    content = buf + strlen(cmd) + 1;
+
+    msg = (char *)malloc(size * sizeof(char));
+    memset(msg, 0, size);
+    if(!strcmp("/serv", cmd)) {
+        snprintf(msg, size, "[Server] %s", content);
+    } else if(!strcmp("/private", cmd)) {
+        snprintf(msg, size, "[Private] %s", content);
+    } else if(!strcmp("/msg", cmd)) {
+        snprintf(msg, size, "%s", content);
+    }
+    printf("%s", msg);
+
+    free(msg);
+    free(tmp);
+
+    return ;
 }
