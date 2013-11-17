@@ -117,9 +117,9 @@ void show_msg(char buf[], int size) {
     msg = (char *)malloc(size * sizeof(char));
     memset(msg, 0, size);
     if(!strcmp("/serv", cmd)) {
-        snprintf(msg, size, "[Server] %s", content);
+        snprintf(msg, size, "[Server]: %s", content);
     } else if(!strcmp("/private", cmd)) {
-        snprintf(msg, size, "[Private] %s", content);
+        snprintf(msg, size, "[Private]: %s", content);
     } else if(!strcmp("/msg", cmd)) {
         snprintf(msg, size, "%s", content);
     }

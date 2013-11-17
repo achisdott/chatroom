@@ -44,6 +44,7 @@ struct profile {
 
 void init_user(struct profile * [], int);
 int buf_loader(struct profile * [], int, int, char [], int, char *);
+int send_msg(int, char *, size_t, int);
 int broadcast(int [], int, char [], int);
 int cmd_process(struct profile * [], int , int [], char [], int);
 
@@ -141,7 +142,7 @@ int main(int argc, char * argv[]) {
                             }
                             break;
                         }
-                        printf("Connection established: %d\n", new_sd);
+                        printf("Connection established: [%d]\n", new_sd);
                         /* HELO */
                         user[new_sd] = (struct profile *)malloc(sizeof(struct profile));
                         init_user(user, new_sd);
@@ -151,7 +152,7 @@ int main(int argc, char * argv[]) {
                             end_server = TRUE;
                             break;
                         }
-                        send(new_sd, buffer, rc + 1, 0);
+                        send_msg(new_sd, buffer, rc + 1, 0);
                         FD_SET(new_sd, &master_set);
                         if(new_sd > max_sd) {
                             max_sd = new_sd;
@@ -163,7 +164,7 @@ int main(int argc, char * argv[]) {
                             end_server = TRUE;
                             break;
                         }
-                        printf("Connected clients: %d\n", broadcast(connected, new_sd, buffer, rc + 1));
+                        printf("%d nick(s)\n", broadcast(connected, new_sd, buffer, rc + 1));
                     } while(TRUE);
                 } else {
                     close_conn = FALSE;
@@ -177,11 +178,11 @@ int main(int argc, char * argv[]) {
                             }
                             break;
                         } else if(rc == 0) {
-                            printf("Connection closed: %d\n", i);
+                            printf("Connection closed: [%d]\n", i);
                             close_conn = TRUE;
                             break;
                         }
-                        printf("From %d: %s", i, buffer);
+                        printf("From [%d]: %s", i, buffer);
                         /* cmd_process */
                         rc = cmd_process(user, i, connected, buffer, sizeof(buffer));
                         if(rc == 1) {
@@ -196,7 +197,7 @@ int main(int argc, char * argv[]) {
                         free(user[i]);
                         connected[i] = FALSE;
                         rc = buf_loader(user, i, BYE, buffer, BUFFER_SIZE, NULL);
-                        printf("Connected clients: %d\n", broadcast(connected, i, buffer, rc + 1));
+                        printf("%d nick(s)\n", broadcast(connected, i, buffer, rc + 1));
                         FD_CLR(i, &master_set);
                         while(FD_ISSET(max_sd, &master_set) == FALSE) {
                             max_sd -= 1;
@@ -264,13 +265,13 @@ int buf_loader(struct profile * user[], int itself, int msg_type, char buf[], in
             msg_len = snprintf(buf, size, "/serv You're now known as %s.\n", user[itself]->name);
             break;
         case NICK_ERR_1:
-            msg_len = snprintf(buf, size, "/serv Error: Username can only consists of 2~12 English letters.\n");
+            msg_len = snprintf(buf, size, "/serv ERROR: Username can only consists of 2~12 English letters.\n");
             break;
         case NICK_ERR_2:
-            msg_len = snprintf(buf, size, "/serv Error: Username can not be anonymous.\n");
+            msg_len = snprintf(buf, size, "/serv ERROR: Username can not be anonymous.\n");
             break;
         case NICK_ERR_3:
-            msg_len = snprintf(buf, size, "/serv Error: Username can only consists of 2~12 English letters.\n");
+            msg_len = snprintf(buf, size, "/serv ERROR: Username can only consists of 2~12 English letters.\n");
             break;
         case NICK_ERR_4:
             msg_len = snprintf(buf, size, "/serv ERROR: %s has been used by others.\n", user[itself]->name);
@@ -279,7 +280,7 @@ int buf_loader(struct profile * user[], int itself, int msg_type, char buf[], in
             msg_len = snprintf(buf, size, "/serv SUCCESS: Your message has been sent.\n");
             break;
         case PRIV_2:
-            msg_len = snprintf(buf, size, "/private %s SAID: %s", user[itself]->name, payload);
+            msg_len = snprintf(buf, size, "/private %s %s", user[itself]->name, payload);
             break;
         case PRIV_ERR_1:
             msg_len = snprintf(buf, size, "/serv ERROR: You are anonymous.\n");
@@ -288,7 +289,7 @@ int buf_loader(struct profile * user[], int itself, int msg_type, char buf[], in
             msg_len = snprintf(buf, size, "/serv ERROR: The client to which you sent is anonymous.\n");
             break;
         case PRIV_ERR_3:
-            msg_len = snprintf(buf, size, "/serv ERROR: The client doesn't exist.\n");
+            msg_len = snprintf(buf, size, "/serv ERROR: The receiver doesn't exist.\n");
             break;
         case CMD_ERR:
             msg_len = snprintf(buf, size, "/serv ERROR: Error command.\n");
@@ -303,12 +304,20 @@ int buf_loader(struct profile * user[], int itself, int msg_type, char buf[], in
     return msg_len;
 }
 
+int send_msg(int s, char * msg, size_t len, int flags) {
+    int rc = 0;
+    rc = send(s, msg, len, flags);
+    printf("To [%d]: %s", s, msg);
+
+    return rc;
+}
+
 int broadcast(int connected[], int itself, char buf[], int size) {
     int i, count = 0;
     for(i = 0; i < MAX_USER_COUNT; i++) {
         if(connected[i] == TRUE) {
             if(i != itself) {
-                send(i, buf, size, 0);
+                send_msg(i, buf, size, 0);
             }
             count++;
         }
@@ -332,7 +341,7 @@ int cmd_process(struct profile * user[], int itself, int connected[], char buf[]
         for(i = 0; i < MAX_USER_COUNT; i++) {
             if(connected[i] == TRUE) {
                 line_len = buf_loader(user, i, WHO, msg, MSG_SIZE, NULL);
-                send(itself, msg, line_len + 1, 0);
+                send_msg(itself, msg, line_len + 1, 0);
             }
         }
         return 0;
@@ -342,17 +351,17 @@ int cmd_process(struct profile * user[], int itself, int connected[], char buf[]
         nick[strlen(nick) - 1] = '\0';
         if(strlen(nick) < 2 || strlen(nick) > 12) {
             line_len = buf_loader(user, itself, NICK_ERR_1, msg, MSG_SIZE, NULL);
-            send(itself, msg, line_len + 1, 0);
+            send_msg(itself, msg, line_len + 1, 0);
             return -1;
         } else if(!strcmp("anonymous", nick)) {
             line_len = buf_loader(user, itself, NICK_ERR_2, msg, MSG_SIZE, NULL);
-            send(itself, msg, line_len + 1, 0);
+            send_msg(itself, msg, line_len + 1, 0);
             return -1;
         } else {
             for(i = 0; i < strlen(nick); i++) {
                 if(!isalpha(nick[i])) {
                     line_len = buf_loader(user, itself, NICK_ERR_3, msg, MSG_SIZE, NULL);
-                    send(itself, msg, line_len + 1, 0);
+                    send_msg(itself, msg, line_len + 1, 0);
                     return -1;
                 }
             }
@@ -363,7 +372,7 @@ int cmd_process(struct profile * user[], int itself, int connected[], char buf[]
                 if(connected[i] == TRUE) {
                     if(!strcmp(user[i]->name, nick)) {
                         line_len = buf_loader(user, i, NICK_ERR_4, msg, MSG_SIZE, NULL);
-                        send(itself, msg, line_len + 1, 0);
+                        send_msg(itself, msg, line_len + 1, 0);
                         return -1;
                     }
                 }
@@ -373,19 +382,19 @@ int cmd_process(struct profile * user[], int itself, int connected[], char buf[]
         broadcast(connected, itself, msg, line_len + 1);
         snprintf(user[itself]->name, MAX_NAME_LEN, "%s", nick);
         line_len = buf_loader(user, itself, NICK_2, msg, MSG_SIZE, NULL);
-        send(itself, msg, line_len + 1, 0);
+        send_msg(itself, msg, line_len + 1, 0);
         return 0;
     } else if(!strcmp("/private", cmd)) {
         if(!strcmp(user[itself]->name, "anonymous")) {
             line_len = buf_loader(user, itself, PRIV_ERR_1, msg, MSG_SIZE, NULL);
-            send(itself, msg, line_len + 1, 0);
+            send_msg(itself, msg, line_len + 1, 0);
             return -1;
         }
         content = tmp + strlen(cmd) + 1;
         nick = strtok(content, " ");
         if(!strcmp(nick, "anonymous")) {
             line_len = buf_loader(user, itself, PRIV_ERR_2, msg, MSG_SIZE, NULL);
-            send(itself, msg, line_len + 1, 0);
+            send_msg(itself, msg, line_len + 1, 0);
             return -1;
         }
         for(i = 0; i < MAX_USER_COUNT; i++) {
@@ -393,24 +402,24 @@ int cmd_process(struct profile * user[], int itself, int connected[], char buf[]
                 if(!strcmp(user[i]->name, nick)) {
                     content = content + strlen(nick) + 1; /* CAUTION! MAY COREDUMP */
                     line_len = buf_loader(user, itself, PRIV_1, msg, MSG_SIZE, NULL);
-                    send(itself, msg, line_len + 1, 0);
+                    send_msg(itself, msg, line_len + 1, 0);
                     line_len = buf_loader(user, itself, PRIV_2, msg, MSG_SIZE, content);
-                    send(i, msg, line_len + 1, 0);
+                    send_msg(i, msg, line_len + 1, 0);
                     return 0;
                 }
             }
         }
         line_len = buf_loader(user, itself, PRIV_ERR_3, msg, MSG_SIZE, NULL);
-        send(itself, msg, line_len + 1, 0);
+        send_msg(itself, msg, line_len + 1, 0);
         return -1;
     } else if(cmd[0] == '/') {
         line_len = buf_loader(user, itself, CMD_ERR, msg, MSG_SIZE, NULL);
-        send(itself, msg, line_len + 1, 0);
+        send_msg(itself, msg, line_len + 1, 0);
         return -1;
     } else {
         line_len = buf_loader(user, itself, BRO, msg, MSG_SIZE, buf);
         broadcast(connected, itself, msg, line_len + 1);
-        send(itself, msg, line_len + 1, 0);
+        send_msg(itself, msg, line_len + 1, 0);
         return 0;
     }
     return 0;
