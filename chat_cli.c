@@ -18,7 +18,7 @@ int main(int argc, char * argv[]) {
     char * recv_tmp = recv_buf;
     struct hostent * host;
     struct sockaddr_in addr;
-    struct fd_set rset;
+    fd_set rset;
 
     if(argc < 3) {
         printf("Usage: ./chat_cli <IP> <Port>\n");
@@ -82,7 +82,7 @@ int main(int argc, char * argv[]) {
             }
         }
         if(FD_ISSET(fileno(stdin), &rset)) {
-            if(fgets(send_buf, 1024, stdin) == NULL || !strcmp("/quit\n", send_buf)) {
+            if(fgets(send_buf, 1024, stdin) == NULL || !strcmp("logout\n", send_buf)) {
                 break;
             } else {
                 /* SEND() */
@@ -130,3 +130,4 @@ void show_msg(char buf[], int size) {
 
     return ;
 }
+
