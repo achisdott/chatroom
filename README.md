@@ -11,7 +11,7 @@ Socket Programming Practice
 
 ## Spec
 
-1. Broadcast Message: broadcast Message
+1. Broadcast Message: `broadcast Message`
 2. Private Message: `message <User> <Message>`
 4. Who: `whoelse` `wholasthr`
 5. Quit: `logout`
